@@ -188,19 +188,29 @@ else {
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 
     <script>
-    document.addEventListener('DOMContentLoaded', function () {
+    document.addEventListener('DOMContentLoaded', function() {
         var bookingModal = document.getElementById('bookingModal');
-        var currentRoomPrice = 0;
+        var currentRoomPrice = 0; // Biến toàn cục lưu giá phòng hiện tại
 
-        // --- 1. CẤU HÌNH FLATPICKR (LỊCH dd/mm/yyyy) ---
-        
+        // 1. CẤU HÌNH FLATPICKR
         var fpCheckIn = flatpickr("#check_in_date", {
-            locale: "vn",           
-            dateFormat: "Y-m-d",     // Định dạng giá trị gửi đi (định dạng CSDL)
-            altInput: true,         
-            altFormat: "d/m/Y",      // Định dạng hiển thị
+            locale: "vn",
+            dateFormat: "Y-m-d", // Format gửi về server
+            altInput: true,
+            altFormat: "d/m/Y", // Format hiển thị
+            minDate: "today",
             onChange: function(selectedDates, dateStr, instance) {
-                fpCheckOut.set('minDate', dateStr); 
+                // Khi chọn ngày đến, ngày đi phải lớn hơn ngày đến ít nhất 1 ngày
+                if (selectedDates[0]) {
+                    var minOutDate = new Date(selectedDates[0]);
+                    minOutDate.setDate(minOutDate.getDate() + 1);
+                    fpCheckOut.set('minDate', minOutDate);
+                    
+                    // Nếu ngày đi hiện tại nhỏ hơn ngày đến mới, xóa ngày đi
+                    if(fpCheckOut.selectedDates[0] && fpCheckOut.selectedDates[0] <= selectedDates[0]){
+                         fpCheckOut.clear();
+                    }
+                }
                 calculateTotalPrice();
             }
         });
@@ -210,11 +220,79 @@ else {
             dateFormat: "Y-m-d",
             altInput: true,
             altFormat: "d/m/Y",
+            minDate: new Date().fp_incr(1), // Mặc định ngày mai
             onChange: function(selectedDates, dateStr, instance) {
                 calculateTotalPrice();
             }
         });
 
-        // --- 2. HÀM TÍNH TOÁN GIÁ (Giữ nguyên) ---
+        // 2. XỬ LÝ KHI MỞ MODAL (QUAN TRỌNG NHẤT)
+        bookingModal.addEventListener('show.bs.modal', function(event) {
+            // Nút đã kích hoạt modal
+            var button = event.relatedTarget;
+
+            // Lấy thông tin từ data-attribute của nút bấm
+            var roomId = button.getAttribute('data-room-id');
+            var roomNumber = button.getAttribute('data-room-number');
+            var roomPrice = parseFloat(button.getAttribute('data-room-price'));
+            
+            // Lấy ngày từ PHP truyền vào (nếu người dùng đã search trước đó)
+            // Lưu ý: data-check-in đang là d/m/Y, cần parse cẩn thận nếu muốn set lại
+            // Cách đơn giản: Nếu PHP trả về định dạng hiển thị, ta chỉ cần set vào nếu đúng format.
+            // Tuy nhiên để đơn giản, ta ưu tiên để trống cho người dùng chọn hoặc dùng logic sau:
+            
+            var checkInVal = button.getAttribute('data-check-in'); // d/m/Y
+            var checkOutVal = button.getAttribute('data-check-out'); // d/m/Y
+
+            // Cập nhật UI Modal
+            var modalTitle = bookingModal.querySelector('.modal-title span');
+            var modalPriceDisplay = document.getElementById('modal_room_price_display');
+            var inputRoomId = document.getElementById('modal_room_id');
+
+            modalTitle.textContent = roomNumber;
+            modalPriceDisplay.textContent = new Intl.NumberFormat('vi-VN').format(roomPrice);
+            inputRoomId.value = roomId;
+            currentRoomPrice = roomPrice;
+
+            // Reset giá tiền về 0
+            document.getElementById('total_price_calculated').textContent = "0 VNĐ";
+            document.getElementById('modal_total_price').value = 0;
+
+            // (Tùy chọn) Nếu muốn điền sẵn ngày người dùng đã tìm kiếm:
+            // Bạn cần đảm bảo PHP trả về Y-m-d vào data-attribute để flatpickr hiểu dễ nhất
+            // Hiện tại code PHP của bạn trả d/m/Y nên JS parse sẽ hơi phức tạp, 
+            // Tạm thời ta clear lịch để khách chọn lại cho chính xác.
+            if(!checkInVal) fpCheckIn.clear();
+            if(!checkOutVal) fpCheckOut.clear();
+        });
+
+        // 3. HÀM TÍNH TOÁN TỔNG TIỀN
         function calculateTotalPrice() {
-            var checkIn = document.getElementById('check_in_date').value
+            var checkInDate = fpCheckIn.selectedDates[0];
+            var checkOutDate = fpCheckOut.selectedDates[0];
+            var totalPriceDisplay = document.getElementById('total_price_calculated');
+            var totalPriceInput = document.getElementById('modal_total_price');
+
+            if (checkInDate && checkOutDate) {
+                // Tính số mili-giây chênh lệch
+                var diffTime = Math.abs(checkOutDate - checkInDate);
+                // Chuyển sang số ngày (chia cho ms trong 1 ngày)
+                var diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+
+                if (diffDays > 0) {
+                    var total = diffDays * currentRoomPrice;
+                    
+                    // Format tiền tệ VNĐ
+                    totalPriceDisplay.textContent = new Intl.NumberFormat('vi-VN').format(total) + " VNĐ (" + diffDays + " đêm)";
+                    totalPriceInput.value = total; // Cập nhật vào input hidden để gửi đi
+                } else {
+                    totalPriceDisplay.textContent = "0 VNĐ";
+                    totalPriceInput.value = 0;
+                }
+            } else {
+                totalPriceDisplay.textContent = "0 VNĐ";
+                totalPriceInput.value = 0;
+            }
+        }
+    });
+</script>
