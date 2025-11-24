@@ -28,7 +28,7 @@ if ($_SERVER['HTTP_HOST'] == 'localhost' || $_SERVER['HTTP_HOST'] == '127.0.0.1'
     $db_user = 'if0_40426028';            // Lấy từ ảnh bạn gửi
     
     // [QUAN TRỌNG] Dán mật khẩu vPanel/FTP của bạn vào giữa hai dấu nháy đơn bên dưới:
-    $db_pass = 'DÁN_MẬT_KHẨU_CỦA_BẠN_VÀO_ĐÂY'; 
+    $db_pass = 'c6UO2a80pv'; 
 
     // Đường dẫn gốc trên hosting (Bạn kiểm tra lại tên miền chính xác nhé)
     // Ví dụ: http://buctuongthanhman.infinityfreeapp.com/
