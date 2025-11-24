@@ -264,24 +264,57 @@ else {
         }
 
         // --- HÀM TÍNH TIỀN ---
-        function calculateTotalPrice() {
-            var checkInDate = fpCheckIn.selectedDates[0];
-            var checkOutDate = fpCheckOut.selectedDates[0];
+        // --- HÀM TÍNH TIỀN (Đã nâng cấp tính năng tăng giá cuối tuần) ---
+function calculateTotalPrice() {
+    var checkInDate = fpCheckIn.selectedDates[0];
+    var checkOutDate = fpCheckOut.selectedDates[0];
+    var totalPriceDisplay = document.getElementById('total_price_calculated');
+    var totalPriceInput = document.getElementById('modal_total_price');
 
-            if (checkInDate && checkOutDate) {
-                var diffTime = Math.abs(checkOutDate - checkInDate);
-                var diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+    if (checkInDate && checkOutDate && checkOutDate > checkInDate) {
+        var total = 0;
+        var nights = 0;
+        
+        // Tạo biến tạm để lặp, tránh ảnh hưởng biến gốc
+        // Chúng ta dùng loop để duyệt từng ngày
+        var currentDate = new Date(checkInDate);
 
-                if (diffDays > 0) {
-                    var total = diffDays * currentRoomPrice;
-                    updateTotalDisplay(total, diffDays);
-                } else {
-                    updateTotalDisplay(0, 0);
-                }
+        while (currentDate < checkOutDate) {
+            // getDay(): 0 là Chủ Nhật, 6 là Thứ 7
+            var dayOfWeek = currentDate.getDay(); 
+            
+            // Logic: Nếu là T7 (6) hoặc CN (0) thì giá * 110% (tăng 10%)
+            // Ngược lại thì giữ nguyên giá gốc
+            if (dayOfWeek === 6 || dayOfWeek === 0) {
+                total += currentRoomPrice * 1.1; 
             } else {
-                updateTotalDisplay(0, 0);
+                total += currentRoomPrice;
             }
+
+            // Tăng ngày lên 1 để kiểm tra ngày tiếp theo
+            currentDate.setDate(currentDate.getDate() + 1);
+            nights++;
         }
+
+        // Làm tròn số tiền (tránh lỗi số lẻ thập phân)
+        total = Math.round(total);
+
+        if (nights > 0) {
+            // Hiển thị kết quả
+            totalPriceDisplay.textContent = new Intl.NumberFormat('vi-VN').format(total) + " VNĐ (" + nights + " đêm)";
+            totalPriceDisplay.classList.remove('text-muted');
+            totalPriceDisplay.classList.add('text-success');
+            
+            // Cập nhật input hidden
+            totalPriceInput.value = total;
+        }
+    } else {
+        // Trường hợp chưa chọn đủ ngày
+        totalPriceDisplay.textContent = "0 VNĐ";
+        totalPriceDisplay.classList.add('text-muted');
+        totalPriceInput.value = 0;
+    }
+}
 
         // Hàm cập nhật hiển thị giá
         function updateTotalDisplay(amount, nights) {
