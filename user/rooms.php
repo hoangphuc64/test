@@ -183,24 +183,37 @@ else {
       </div>
     </div>
 
-    <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
-    <script src="https://npmcdn.com/flatpickr/dist/l10n/vn.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 
-    <script>
-    document.addEventListener('DOMContentLoaded', function () {
-        var bookingModal = document.getElementById('bookingModal');
+<script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
+<script src="https://npmcdn.com/flatpickr/dist/l10n/vn.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        // Khai báo các biến
+        var bookingModalEl = document.getElementById('bookingModal');
         var currentRoomPrice = 0;
-
-        // --- 1. CẤU HÌNH FLATPICKR (LỊCH dd/mm/yyyy) ---
         
+        // --- CẤU HÌNH LỊCH (FLATPICKR) ---
         var fpCheckIn = flatpickr("#check_in_date", {
-            locale: "vn",           
-            dateFormat: "Y-m-d",     // Định dạng giá trị gửi đi (định dạng CSDL)
-            altInput: true,         
-            altFormat: "d/m/Y",      // Định dạng hiển thị
+            locale: "vn",
+            dateFormat: "Y-m-d", // Gửi lên server: Năm-Tháng-Ngày
+            altInput: true,
+            altFormat: "d/m/Y",  // Hiển thị: Ngày/Tháng/Năm
+            minDate: "today",
             onChange: function(selectedDates, dateStr, instance) {
-                fpCheckOut.set('minDate', dateStr); 
+                // Khi chọn ngày đến, ngày đi phải lớn hơn ít nhất 1 ngày
+                if (selectedDates[0]) {
+                    var minOutDate = new Date(selectedDates[0]);
+                    minOutDate.setDate(minOutDate.getDate() + 1);
+                    fpCheckOut.set('minDate', minOutDate);
+                    
+                    // Nếu ngày đi hiện tại không hợp lệ, xóa đi
+                    if(fpCheckOut.selectedDates[0] && fpCheckOut.selectedDates[0] <= selectedDates[0]){
+                         fpCheckOut.clear();
+                    }
+                }
                 calculateTotalPrice();
             }
         });
@@ -210,11 +223,81 @@ else {
             dateFormat: "Y-m-d",
             altInput: true,
             altFormat: "d/m/Y",
+            minDate: new Date().fp_incr(1),
             onChange: function(selectedDates, dateStr, instance) {
                 calculateTotalPrice();
             }
         });
 
-        // --- 2. HÀM TÍNH TOÁN GIÁ (Giữ nguyên) ---
+        // --- SỰ KIỆN KHI MỞ MODAL ---
+        // Sử dụng event của Bootstrap để bắt sự kiện mở
+        if (bookingModalEl) {
+            bookingModalEl.addEventListener('show.bs.modal', function(event) {
+                // Nút đã bấm để mở modal
+                var button = event.relatedTarget;
+
+                // Lấy dữ liệu từ nút bấm (data-...)
+                var roomId = button.getAttribute('data-room-id');
+                var roomNumber = button.getAttribute('data-room-number');
+                var roomPrice = parseFloat(button.getAttribute('data-room-price'));
+                
+                // Lấy ngày tìm kiếm trước đó (nếu có)
+                var prevCheckIn = button.getAttribute('data-check-in'); 
+                var prevCheckOut = button.getAttribute('data-check-out');
+
+                // Cập nhật giao diện Modal
+                document.getElementById('modal_room_number').textContent = roomNumber;
+                document.getElementById('modal_room_price_display').textContent = new Intl.NumberFormat('vi-VN').format(roomPrice);
+                document.getElementById('modal_room_id').value = roomId;
+                
+                // Lưu giá hiện tại để tính toán
+                currentRoomPrice = roomPrice;
+                
+                // Reset tổng tiền
+                updateTotalDisplay(0, 0);
+
+                // Logic điền ngày (nếu cần thiết, ở đây ta ưu tiên reset để khách chọn lại cho đúng)
+                // Nếu muốn giữ ngày tìm kiếm, bỏ comment 2 dòng dưới:
+                // if(prevCheckIn) fpCheckIn.setDate(prevCheckIn, true); 
+                // if(prevCheckOut) fpCheckOut.setDate(prevCheckOut, true);
+            });
+        }
+
+        // --- HÀM TÍNH TIỀN ---
         function calculateTotalPrice() {
-            var checkIn = document.getElementById('check_in_date').value
+            var checkInDate = fpCheckIn.selectedDates[0];
+            var checkOutDate = fpCheckOut.selectedDates[0];
+
+            if (checkInDate && checkOutDate) {
+                var diffTime = Math.abs(checkOutDate - checkInDate);
+                var diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+
+                if (diffDays > 0) {
+                    var total = diffDays * currentRoomPrice;
+                    updateTotalDisplay(total, diffDays);
+                } else {
+                    updateTotalDisplay(0, 0);
+                }
+            } else {
+                updateTotalDisplay(0, 0);
+            }
+        }
+
+        // Hàm cập nhật hiển thị giá
+        function updateTotalDisplay(amount, nights) {
+            var displayEl = document.getElementById('total_price_calculated');
+            var inputEl = document.getElementById('modal_total_price');
+            
+            if(amount > 0){
+                displayEl.textContent = new Intl.NumberFormat('vi-VN').format(amount) + " VNĐ (" + nights + " đêm)";
+                displayEl.classList.remove('text-muted');
+                displayEl.classList.add('text-success');
+            } else {
+                displayEl.textContent = "0 VNĐ";
+                displayEl.classList.add('text-muted');
+                displayEl.classList.remove('text-success');
+            }
+            inputEl.value = amount;
+        }
+    });
+</script>
