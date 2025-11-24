@@ -19,21 +19,17 @@ if ($_SERVER['HTTP_HOST'] == 'localhost' || $_SERVER['HTTP_HOST'] == '127.0.0.1'
     
     // Đường dẫn gốc ở máy nhà (Đã sửa lỗi dư dấu : của bạn)
     define('BASE_URL', 'http://localhost/QLKS/'); 
+}  else {
 
-} else {
+    $db_host = 'sql100.infinityfree.com';
+    $db_name = 'if0_40426028_QLKS';
+    $db_user = 'if0_40426028';
+    $db_pass = 'c6UO2a80pv';
 
-    // --- TRƯỜNG HỢP 2: CHẠY TRÊN INFINITYFREE ---
-    $db_host = 'sql100.infinityfree.com'; // Lấy từ ảnh bạn gửi
-    $db_name = 'if0_40426028_QLKS';       // Lấy từ ảnh bạn gửi
-    $db_user = 'if0_40426028';            // Lấy từ ảnh bạn gửi
-    
-    // [QUAN TRỌNG] Dán mật khẩu vPanel/FTP của bạn vào giữa hai dấu nháy đơn bên dưới:
-    $db_pass = 'c6UO2a80pv'; 
-
-    // Đường dẫn gốc trên hosting (Bạn kiểm tra lại tên miền chính xác nhé)
-    // Ví dụ: http://buctuongthanhman.infinityfreeapp.com/
-    define('BASE_URL', 'https://buctuongthanhman.infinityfree.me/' . $_SERVER['HTTP_HOST'] . '/');
+    // BASE_URL CHÍNH XÁC CHO HOSTING
+    define('BASE_URL', 'https://buctuongthanhman.infinityfree.me/');
 }
+
 
 // 3. KẾT NỐI CSDL (PDO)
 $charset = 'utf8mb4';
