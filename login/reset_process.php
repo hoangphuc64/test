@@ -1,7 +1,7 @@
 <?php
 session_start();
 include_once(__DIR__ . '/../config.php'); 
-include_once(__DIR__ . '/../controller/AuthController.php'); 
+include_once(__DIR__ . '/../controller/authController.php'); 
 
 // Khởi tạo Controller
 $authController = new AuthController($conn);
