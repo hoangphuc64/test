@@ -74,22 +74,33 @@ class BookingController {
         $stmt->execute(['new_status' => $new_status, 'room_id' => $room_id]);
     }
 
-    /**
+   /**
      * ===============================================
-     * HÀM 1: TẠO ĐƠN ĐẶT PHÒNG (CREATE)
+     * HÀM 1: TẠO ĐƠN ĐẶT PHÒNG (ĐÃ CẬP NHẬT LOGIC TĂNG 10% CUỐI TUẦN)
      * ===============================================
      */
-    public function createBooking($room_id, $check_in, $check_out, $total_price) {
+    public function createBooking($room_id, $check_in, $check_out) { // Đã bỏ tham số $total_price
         try {
-            // 1. Kiểm tra đăng nhập và dữ liệu rỗng
+            // 1. Kiểm tra đăng nhập
             if (!isset($_SESSION['user_id'])) {
                 throw new Exception("Vui lòng đăng nhập để đặt phòng.");
             }
-            if (empty($room_id) || empty($check_in) || empty($check_out) || empty($total_price)) {
-                throw new Exception("Vui lòng nhập đầy đủ thông tin đặt phòng.");
+            if (empty($room_id) || empty($check_in) || empty($check_out)) {
+                throw new Exception("Vui lòng nhập đầy đủ thông tin.");
             }
 
-            // 2. LOGIC MỚI: Tính toán số ngày
+            // 2. Lấy giá gốc của phòng từ Database
+            $stmtPrice = $this->conn->prepare("SELECT price FROM rooms WHERE id = :room_id");
+            $stmtPrice->execute(['room_id' => $room_id]);
+            $roomData = $stmtPrice->fetch(PDO::FETCH_ASSOC);
+            
+            if (!$roomData) {
+                throw new Exception("Phòng không tồn tại.");
+            }
+            
+            $base_price = $roomData['price']; // Giá gốc 1 đêm
+
+            // 3. Tính toán ngày và tổng tiền (Logic tăng 10% T7, CN)
             $start_date = new DateTime($check_in);
             $end_date = new DateTime($check_out);
 
@@ -97,17 +108,34 @@ class BookingController {
                 throw new Exception("Ngày trả phòng phải sau ngày nhận phòng.");
             }
 
-            $interval = $start_date->diff($end_date);
-            $days = $interval->days; // Số ngày lưu trú
+            $total_calculated = 0;
+            $curr_date = clone $start_date;
 
-            // 3. LOGIC MỚI: Chặn nếu >= 30 ngày
+            // Vòng lặp qua từng ngày để cộng tiền
+            while ($curr_date < $end_date) {
+                $day_of_week = $curr_date->format('N'); // 1 (Thứ 2) -> 7 (CN)
+                
+                // Nếu là Thứ 7 (6) hoặc CN (7) thì tăng 10%
+                if ($day_of_week == 6 || $day_of_week == 7) {
+                    $total_calculated += $base_price * 1.1; 
+                } else {
+                    $total_calculated += $base_price;
+                }
+                
+                $curr_date->modify('+1 day');
+            }
+
+            // Kiểm tra giới hạn 30 ngày
+            $interval = $start_date->diff($end_date);
+            $days = $interval->days;
+
             if ($days >= 30) {
                 throw new Exception("Xin lỗi, chúng tôi chỉ nhận đặt phòng dưới 30 ngày.");
             }
 
             $user_id = $_SESSION['user_id'];
             
-            // 4. Thêm đơn vào CSDL
+            // 4. Insert vào DB với giá ĐÃ TÍNH TOÁN ($total_calculated)
             $sql = "INSERT INTO bookings (user_id, room_id, check_in_date, check_out_date, total_price, status, created_at) 
                     VALUES (:user_id, :room_id, :check_in, :check_out, :total_price, 'pending', NOW())";
             
@@ -117,29 +145,27 @@ class BookingController {
                 'room_id' => $room_id,
                 'check_in' => $check_in,
                 'check_out' => $check_out,
-                'total_price' => $total_price
+                'total_price' => $total_calculated // Dùng biến tự tính
             ]);
             
-            // 5. Cập nhật trạng thái phòng
             if ($stmt->rowCount() > 0) {
                  $this->updateRoomStatusAfterBooking($room_id, 'occupied');
             }
 
-            // 6. LOGIC MỚI: Trả về kết quả dựa trên số ngày (> 15 ngày thì cảnh báo)
+            // Trả về kết quả
             if ($days > 15) {
                 return [
-                    'status' => 'warning', // Dùng để hiện icon màu vàng
-                    'message' => "Đặt phòng thành công! <br><b>Lưu ý:</b> Vì bạn đặt dài hạn ($days ngày), vui lòng thanh toán trong vòng <b>24 giờ</b>, nếu không đơn sẽ bị hủy tự động."
+                    'status' => 'warning',
+                    'message' => "Đặt phòng thành công! Tổng tiền: " . number_format($total_calculated) . " VND. <br>Lưu ý: Đặt dài hạn vui lòng thanh toán trong 24h."
                 ];
             } else {
                 return [
-                    'status' => 'success', // Dùng để hiện icon màu xanh
-                    'message' => "Đặt phòng thành công. Đơn đang chờ xác nhận."
+                    'status' => 'success',
+                    'message' => "Đặt phòng thành công. Tổng tiền: " . number_format($total_calculated) . " VND."
                 ];
             }
 
         } catch (Exception $e) {
-            // Trả về mảng lỗi để đồng bộ
             return [
                 'status' => 'error',
                 'message' => "Lỗi đặt phòng: " . $e->getMessage()
