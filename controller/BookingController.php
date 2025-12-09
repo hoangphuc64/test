@@ -90,15 +90,22 @@ class BookingController {
             }
 
             // 2. Lấy giá gốc của phòng từ Database
-            $stmtPrice = $this->conn->prepare("SELECT price FROM rooms WHERE id = :room_id");
+            // Sửa 'price' thành 'base_price' (hoặc tên đúng trong bảng rooms của bạn)
+           $sql = "SELECT rt.base_price 
+                    FROM rooms r 
+                    JOIN room_types rt ON r.room_type_id = rt.id 
+                    WHERE r.id = :room_id";
+
+            $stmtPrice = $this->conn->prepare($sql);
             $stmtPrice->execute(['room_id' => $room_id]);
             $roomData = $stmtPrice->fetch(PDO::FETCH_ASSOC);
-            
+
             if (!$roomData) {
-                throw new Exception("Phòng không tồn tại.");
+                throw new Exception("Phòng không tồn tại hoặc loại phòng chưa có giá.");
             }
-            
-            $base_price = $roomData['price']; // Giá gốc 1 đêm
+
+        
+            $base_price = $roomData['base_price'];
 
             // 3. Tính toán ngày và tổng tiền (Logic tăng 10% T7, CN)
             $start_date = new DateTime($check_in);
